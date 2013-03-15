@@ -1,0 +1,25 @@
+<html>
+<head>
+<title>My WebGL</title>
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+<!-- see https://github.com/toji/gl-matrix for gl-matrix --!>
+<script type="text/javascript" src="gl-matrix-min.js"></script>
+
+<script type="text/javascript" src="my_webgl.js"></script>
+</head>
+
+<body>
+<h1>My WebGL</h1>
+<div style="float: right">
+<input type="checkbox" id="invert-mouse-y" /> Invert mouse (Y axis)<br />
+<input type="checkbox" id="invert-mouse-x" /> Invert mouse (X axis)<br />
+</div>
+<canvas id="canvas" style="border: 1px solid black;" width="900" height="480"></canvas>
+<script type="text/javascript">
+$(document).ready(function() {
+   do_webgl();
+   $('#canvas').on('click', lock_pointer);
+});
+</script>
+</body>
+</html>
