@@ -22,6 +22,15 @@ var camera = {
     z:  1.0,
 };
 
+var move_keys = {
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+};
+
 window.requestAnimFrame =
     window.requestAnimationFrame ||
     window.mozRequestAnimationFrame ||
@@ -166,10 +175,32 @@ function draw() {
     mat4.identity(mv_mat);
     mat4.rotateX(mv_mat, mv_mat, camera.rx);
     mat4.rotateY(mv_mat, mv_mat, camera.ry);
-    //camera.ry += 0.01;
-    //if (camera.ry > 3.1415 * 2.0 ) {
-    //    camera.ry = 0.0;
-    //}
+    var mv_side = 0;
+    var mv_forward = 0;
+    if (move_keys.forward) {
+        mv_forward -= 0.1;
+    }
+    if (move_keys.backward) {
+        mv_forward += 0.1;
+    }
+    if (move_keys.left) {
+        mv_side -= 0.1;
+    }
+    if (move_keys.right) {
+        mv_side += 0.1;
+    }
+    // I tried doing this with gl-matrix - it's a lot easier this way
+    var c = Math.cos(camera.ry);
+    var s = Math.sin(camera.ry);
+    camera.x += c * mv_side    - s * mv_forward;
+    camera.y += c * mv_forward + s * mv_side;
+    if (move_keys.up) {
+        camera.z += 0.1;
+    }
+    if (move_keys.down) {
+        camera.z -= 0.1;
+    }
+
     mat4.translate(mv_mat, mv_mat, [-camera.x , -camera.z, -camera.y]);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
@@ -183,22 +214,71 @@ function draw() {
     gl.drawElements(gl.TRIANGLES, v_count, gl.UNSIGNED_SHORT, 0);
 }
 
+function mouse_move(e) {
+    var factor_y = $('#invert-mouse-y').prop('checked') ? -0.01 : 0.01;
+    var factor_x = $('#invert-mouse-x').prop('checked') ? -0.01 : 0.01;
+    e = e.originalEvent;
+    if (!!document.mozPointerLockElement) {
+        camera.ry += e.mozMovementX * factor_x;
+        camera.rx += e.mozMovementY * factor_y;
+    } else if (!!document.webkitPointerLockElement) {
+        camera.ry += e.webkitMovementX * factor_x;
+        camera.rx += e.webkitMovementY * factor_y;
+    }
+}
+
+function key_down(e) {
+    var prevent = true;
+    if (e.which === 38) {
+        move_keys.forward = true;
+    } else if (e.which === 40) {
+        move_keys.backward = true;
+    } else if (e.which === 37) {
+        move_keys.left = true;
+    } else if (e.which === 39) {
+        move_keys.right = true;
+    } else if (e.which === 33) {
+        move_keys.up = true;
+    } else if (e.which === 34) {
+        move_keys.down = true;
+    } else {
+        prevent = false;
+    }
+    if (prevent) {
+        e.preventDefault();
+    }
+}
+
+function key_up(e) {
+    var prevent = true;
+    if (e.which === 38) {
+        move_keys.forward = false;
+    } else if (e.which === 40) {
+        move_keys.backward = false;
+    } else if (e.which === 37) {
+        move_keys.left = false;
+    } else if (e.which === 39) {
+        move_keys.right = false;
+    } else if (e.which === 33) {
+        move_keys.up = false;
+    } else if (e.which === 34) {
+        move_keys.down = false;
+    } else {
+        prevent = false;
+    }
+    if (prevent) {
+        e.preventDefault();
+    }
+}
+
 function lock_pointer() {
     //console.log('lock it!');
     var canvas = $("#canvas")[0];
-    document.addEventListener('mozfullscreenchange', fullscreenChange, false);
-    document.addEventListener('webkitfullscreenchange', fullscreenChange, false);
-    document.addEventListener('mousemove', function(e) {
-        var factor_y = $('#invert-mouse-y').prop('checked') ? -0.01 : 0.01;
-        var factor_x = $('#invert-mouse-x').prop('checked') ? -0.01 : 0.01;
-        if (!!document.mozPointerLockElement) {
-            camera.ry += e.mozMovementX * factor_x;
-            camera.rx += e.mozMovementY * factor_y;
-        } else if (!!document.webkitPointerLockElement) {
-            camera.ry += e.webkitMovementX * factor_x;
-            camera.rx += e.webkitMovementY * factor_y;
-        }
-    });
+    $(document).on('mozfullscreenchange', fullscreenChange);
+    $(document).on('webkitfullscreenchange', fullscreenChange);
+    $(document).mousemove(mouse_move);
+    $(document).keydown(key_down);
+    $(document).keyup(key_up);
 
     canvas.requestFullscreen =
         canvas.requestFullscreen ||
@@ -227,7 +307,7 @@ function fullscreenChange() {
     gl.viewportWidth  = new_width;
     gl.viewportHeight = new_height;
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-    console.log("Fullscreen: " + new_width+ ", " + new_height);
+    //console.log("Fullscreen: " + new_width+ ", " + new_height);
     if (document.mozFullScreen) {
         canvas[0].mozRequestPointerLock();
     } else if (document.webkitIsFullScreen) {
@@ -236,6 +316,6 @@ function fullscreenChange() {
 }
 
 function pointerlockChange() {
-    console.log('pointerlock change');
+    //console.log('pointerlock change');
 }
 
