@@ -17,10 +17,10 @@ var map_y = 50;
 var camera = {
     rx: 0.1,
     ry: 0.0,
-    x:  map_x / 2.0,
-    z:  map_y / 2.0,
-    y:  0.0,
+    t: vec3.fromValues(map_x / 2.0, 0.0, map_y / 2.0),
 };
+var move_mat = mat3.create();
+var move_vec = vec3.create();
 
 var move_keys = {
     forward: false,
@@ -71,8 +71,8 @@ function shaders_loaded() {
             h += rand_field(x/map_x * 2.0 , y/map_y * 2.0) * 1.0;
             v.push(x, h, y);
             //vc.push((x%2)/2.0, (x+y)%4/4.0, (y%3)/3.0, 1.0);
-            if (x == camera.x && y == camera.z) {
-                camera.y = h+1;
+            if (x == camera.t[0] && y == camera.t[2]) {
+                camera.t[1] = h+1;
             }
             h /= 26.0;
             vc.push(h, h, h, 1.0);
@@ -201,30 +201,17 @@ function draw() {
     if (move_keys.down) {
         mv_up -= 0.1;
     }
-    // I tried doing this with gl-matrix - it's a lot easier this way
-    //var cy = Math.cos(camera.ry);
-    //var sy = Math.sin(camera.ry);
-    //var cx = Math.cos(camera.rx);
-    //var sy = Math.cos(camera.rx);
-    //camera.x += c * mv_side    - s * mv_forward;
-    //camera.y += c * mv_forward + s * mv_side;
-    //if (move_keys.up) {
-    //    camera.z += 0.1;
-    //}
-    //if (move_keys.down) {
-    //    camera.z -= 0.1;
-    //}
 
-    var move_mat = mat3.create();
     mat3.fromMat4(move_mat, mv_mat);
     mat3.transpose(move_mat, move_mat); // invert a rotation matrix
-    var movement = vec3.fromValues( mv_side, mv_up, mv_forward);
-    vec3.transformMat3(movement, movement, move_mat);
-    camera.x += movement[0];
-    camera.y += movement[1];
-    camera.z += movement[2];
+    //var movement = vec3.fromValues( mv_side, mv_up, mv_forward);
+    vec3.set(move_vec, mv_side, mv_up, mv_forward);
+    vec3.transformMat3(move_vec, move_vec, move_mat);
+    vec3.add(camera.t, camera.t, move_vec);
 
-    mat4.translate(mv_mat, mv_mat, [-camera.x , -camera.y, -camera.z]);
+    // reuse move_vec as -t
+    vec3.negate(move_vec, camera.t)
+    mat4.translate(mv_mat, mv_mat, move_vec);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
     gl.vertexAttribPointer(shader_program.v_pos, 3, gl.FLOAT, false, 0, 0);
