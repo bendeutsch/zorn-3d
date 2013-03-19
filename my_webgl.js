@@ -19,7 +19,7 @@ var camera = {
     ry: 0.0,
     x:  map_x / 2.0,
     y:  map_y / 2.0,
-    z:  1.0,
+    z:  0.0,
 };
 
 var move_keys = {
@@ -60,23 +60,28 @@ function shaders_loaded() {
     map_position_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
     var v = [ ];
+    var vc = [ ];
     // remember: need one more, for the edges
     for (var y=0; y<=map_y; y++) {
         for (var x=0; x<=map_x; x++) {
-            v.push(x,   (x+y)%3 * 0.1, y);
+            var h;
+            //h = (Math.sin(x / 5.0) + Math.sin(y / 5.0) + 2.0) / 4.0;
+            h = rand_field(x/map_x / 4.0 , y/map_y / 4.0) * 20.0;
+            h += rand_field(x/map_x / 2.0 , y/map_y / 2.0) * 5.0;
+            h += rand_field(x/map_x * 2.0 , y/map_y * 2.0) * 1.0;
+            v.push(x, h, y);
+            //vc.push((x%2)/2.0, (x+y)%4/4.0, (y%3)/3.0, 1.0);
+            if (x == camera.x && y == camera.y) {
+                camera.z = h+1;
+            }
+            h /= 26.0;
+            vc.push(h, h, h, 1.0);
         }
     }
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STATIC_DRAW);
 
     map_color_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_color_buffer);
-    var vc = [ ];
-    // remember: need one more, for the edges
-    for (var y=0; y<=map_y; y++) {
-        for (var x=0; x<=map_x; x++) {
-            vc.push((x%2)/2.0, (x+y)%4/4.0, (y%3)/3.0, 1.0);
-        }
-    }
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vc), gl.STATIC_DRAW);
 
     map_index_buffer = gl.createBuffer();
@@ -319,3 +324,44 @@ function pointerlockChange() {
     //console.log('pointerlock change');
 }
 
+var rand_map = null;
+
+function rand_field(x, y) {
+    var w = 10;
+    var h = 10;
+    if (!rand_map) {
+        rand_map = [];
+        for(var iy=0; iy<=h; iy++) {
+            var row = [];
+            for(var ix=0; ix<=w; ix++) {
+                row.push(Math.random());
+            }
+            row.push(row[0]);
+            rand_map.push(row);
+        }
+        rand_map.push(rand_map[0]);
+    }
+    x = (x - Math.floor(x)) * w;
+    y = (y - Math.floor(y)) * h;
+    var x1 = Math.floor(x);
+    var x2 = x1 + 1;
+    var xd = x - x1;
+    var y1 = Math.floor(y);
+    var y2 = y1 + 1;
+    var yd = y - y1;
+
+    // smoothing with "cubic spline"
+    xd = 3 * xd * xd - 2 * xd * xd * xd;
+    yd = 3 * yd * yd - 2 * yd * yd * yd;
+
+    //console.log(x1, y1, x2, y2);
+    var z1 = rand_map[x1][y1];
+    var z2 = rand_map[x2][y1];
+    var z3 = rand_map[x1][y2];
+    var z4 = rand_map[x2][y2];
+
+    var z = (1-xd)*(1-yd)*z1 + (xd)*(1-yd)*z2 + (1-xd)*(yd)*z3 + (xd)*(yd)*z4;
+
+    return z;
+    //return Math.random();
+}
