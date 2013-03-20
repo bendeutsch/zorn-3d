@@ -11,8 +11,8 @@ var map_color_buffer;
 var map_index_buffer;
 var v_count = 0;
 
-var map_x = 50;
-var map_y = 50;
+var map_x = 255;
+var map_y = 255;
 
 var camera = {
     rx: 0.1,
@@ -66,16 +66,43 @@ function shaders_loaded() {
         for (var x=0; x<=map_x; x++) {
             var h;
             //h = (Math.sin(x / 5.0) + Math.sin(y / 5.0) + 2.0) / 4.0;
-            h = rand_field(x/map_x / 4.0 , y/map_y / 4.0) * 20.0;
-            h += rand_field(x/map_x / 2.0 , y/map_y / 2.0) * 5.0;
-            h += rand_field(x/map_x * 2.0 , y/map_y * 2.0) * 1.0;
+            var dx = Math.abs(x - map_x / 2.0);
+            var dy = Math.abs(y - map_y / 2.0);
+            var d = Math.sqrt(dx * dx + dy * dy);
+            // boundaries, 0-1
+            var h_max = Math.min( 1.0 - (dx / (map_x/2.0)) , 1.0 - (dy / (map_y/2.0)) );
+            h_max = Math.pow(h_max, 1.5);
+            if (h_max < 0.0) { h_max = 0.0; }
+            h = 0;
+            h += rand_field(x / 25.0 , y / 25.0 ) * 0.75;
+            h += rand_field(x / 10.0 , y / 10.0 ) * 0.22;
+            h += rand_field(x / 2.0 , y / 2.0) * 0.03;
+            // h is 0-1
+            var h_min = 2.0 / (2.0 + rand_field(x / 30.0, y/30.0));
+            if (h > h_min) {
+                h = h_min - (h - h_min);
+            }
+            h = (h - 0.1) *  h_max;
+            // h is 0-0.9
+            // create grooves!
+            if (h < 0.0) { h = 0.0; }
+            // h = 0-0.5
+            h *= 100.0;
+            // h = 0-50, tall enough
+
             v.push(x, h, y);
             //vc.push((x%2)/2.0, (x+y)%4/4.0, (y%3)/3.0, 1.0);
-            if (x == camera.t[0] && y == camera.t[2]) {
+            if (x == Math.floor(camera.t[0]) && y == Math.floor(camera.t[2])) {
                 camera.t[1] = h+1;
             }
-            h /= 26.0;
-            vc.push(h, h, h, 1.0);
+            h /= 100.0;
+            if (x == 0 && y == 0) {
+                vc.push(1.0, 0.0, 0.0, 1.0);
+            } else if (x == map_x && y == 0) {
+                vc.push(0.0, 1.0, 0.0, 1.0);
+            } else {
+                vc.push(h, h, h, 1.0);
+            }
         }
     }
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STATIC_DRAW);
@@ -176,7 +203,7 @@ function draw() {
         return;
     }
 
-    mat4.perspective(p_mat, 45, gl.viewportWidth / gl.viewportHeight, 0.01, 100.0);
+    mat4.perspective(p_mat, 45, gl.viewportWidth / gl.viewportHeight, 0.1, 1000.0);
     mat4.identity(mv_mat);
     mat4.rotateX(mv_mat, mv_mat, camera.rx);
     mat4.rotateY(mv_mat, mv_mat, camera.ry);
@@ -184,22 +211,22 @@ function draw() {
     var mv_forward = 0;
     var mv_up = 0;
     if (move_keys.forward) {
-        mv_forward -= 0.1;
+        mv_forward -= 1.1;
     }
     if (move_keys.backward) {
-        mv_forward += 0.1;
+        mv_forward += 1.1;
     }
     if (move_keys.left) {
-        mv_side -= 0.1;
+        mv_side -= 1.1;
     }
     if (move_keys.right) {
-        mv_side += 0.1;
+        mv_side += 1.1;
     }
     if (move_keys.up) {
-        mv_up += 0.1;
+        mv_up += 1.1;
     }
     if (move_keys.down) {
-        mv_up -= 0.1;
+        mv_up -= 1.1;
     }
 
     mat3.fromMat4(move_mat, mv_mat);
@@ -336,9 +363,9 @@ function rand_field(x, y) {
     var h = 10;
     if (!rand_map) {
         rand_map = [];
-        for(var iy=0; iy<=h; iy++) {
+        for(var iy=0; iy<h; iy++) {
             var row = [];
-            for(var ix=0; ix<=w; ix++) {
+            for(var ix=0; ix<w; ix++) {
                 row.push(Math.random());
             }
             row.push(row[0]);
@@ -346,6 +373,7 @@ function rand_field(x, y) {
         }
         rand_map.push(rand_map[0]);
     }
+    x = x / w; y = y / h;
     x = (x - Math.floor(x)) * w;
     y = (y - Math.floor(y)) * h;
     var x1 = Math.floor(x);
