@@ -7,6 +7,7 @@ var p_mat;
 var mv_mat;
 var n_mat;
 
+var map_heights = [];
 var map_position_buffer;
 var map_color_buffer;
 var map_index_buffer;
@@ -61,13 +62,11 @@ function shaders_loaded() {
     shader_program.p_mat = gl.getUniformLocation(shader_program, "P");
     shader_program.mv_mat = gl.getUniformLocation(shader_program, "MV");
     shader_program.n_mat = gl.getUniformLocation(shader_program, "N");
-    console.log(shader_program.n_mat);
     shader_program.light = gl.getUniformLocation(shader_program, "light_direction");
 
     map_position_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
     var v = [ ];
-    var vh = [ ];
     var vc = [ ];
     // remember: need one more, for the edges
     for (var y=0; y<=map_y; y++) {
@@ -119,7 +118,7 @@ function shaders_loaded() {
             h *= 50.0;
             // h = 0-50, tall enough
 
-            vh.push(h);
+            map_heights.push(h);
             v.push(x, h, y);
             //vc.push((x%2)/2.0, (x+y)%4/4.0, (y%3)/3.0, 1.0);
             if (x == Math.floor(camera.t[0]) && y == Math.floor(camera.t[2])) {
@@ -147,16 +146,12 @@ function shaders_loaded() {
         vn.push(0.0, 1.0, 0.0);
         for (var x=1; x<map_x; x++) {
             n_tmp = vec3.fromValues(
-                vh[(x+1) + (map_x+1) * y] - vh[(x-1) + (map_x+1) * y],
+                map_heights[(x+1) + (map_x+1) * y] - map_heights[(x-1) + (map_x+1) * y],
                 1.0,
-                vh[x + (map_x+1) * (y+1)] - vh[x + (map_x+1) * (y-1)]
+                map_heights[x + (map_x+1) * (y+1)] - map_heights[x + (map_x+1) * (y-1)]
             );
             vec3.normalize(n_tmp, n_tmp);
             vn.push(n_tmp[0], n_tmp[1], n_tmp[2]);
-            //vn.push(0.0, 1.0, 0.0);
-            if (y==20 && x ==20) {
-                console.log(n_tmp);
-            }
         }
         vn.push(0.0, 1.0, 0.0);
     }
@@ -266,22 +261,22 @@ function draw() {
     var mv_forward = 0;
     var mv_up = 0;
     if (move_keys.forward) {
-        mv_forward -= 1.1;
+        mv_forward -= 0.1;
     }
     if (move_keys.backward) {
-        mv_forward += 1.1;
+        mv_forward += 0.1;
     }
     if (move_keys.left) {
-        mv_side -= 1.1;
+        mv_side -= 0.1;
     }
     if (move_keys.right) {
-        mv_side += 1.1;
+        mv_side += 0.1;
     }
     if (move_keys.up) {
-        mv_up += 1.1;
+        mv_up += 0.1;
     }
     if (move_keys.down) {
-        mv_up -= 1.1;
+        mv_up -= 0.1;
     }
 
     mat3.fromMat4(move_mat, mv_mat);
@@ -290,6 +285,9 @@ function draw() {
     vec3.set(move_vec, mv_side, mv_up, mv_forward);
     vec3.transformMat3(move_vec, move_vec, move_mat);
     vec3.add(camera.t, camera.t, move_vec);
+    if (camera.t[1] <= map_height_at(camera.t[0], camera.t[2]) + 1.0 )  {
+        camera.t[1] = map_height_at(camera.t[0], camera.t[2]) + 1.0;
+    }
 
     // reuse move_vec as -t
     vec3.negate(move_vec, camera.t)
@@ -463,4 +461,20 @@ function rand_field(x, y) {
 
     return z;
     //return Math.random();
+}
+
+function map_height_at(x, y) {
+    if (x <= 0.0 || y <= 0.0 || x >= map_x || y >= map_y) {
+        return 0.0; // sea level
+    }
+    var x0 = Math.floor(x);
+    var y0 = Math.floor(y);
+    var x1 = x0 + 1;
+    var y1 = y0 + 1;
+    var dx = x - x0;
+    var dy = y - y0;
+    return (1-dx)*(1-dy)*map_heights[x0 + (map_x+1) * y0] +
+        (dx)*(1-dy)*map_heights[x1 + (map_x+1) * y0] +
+        (1-dx)*(dy)*map_heights[x0 + (map_x+1) * y1] +
+        (dx)*(dy)*map_heights[x1 + (map_x+1) * y1];
 }
