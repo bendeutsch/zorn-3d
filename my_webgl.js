@@ -5,10 +5,12 @@ var shader_program;
 var clear_color = 0.4;
 var p_mat;
 var mv_mat;
+var n_mat;
 
 var map_position_buffer;
 var map_color_buffer;
 var map_index_buffer;
+var map_normal_buffer;
 var v_count = 0;
 
 var map_x = 255;
@@ -51,15 +53,21 @@ function shaders_loaded() {
     gl.useProgram(shader_program);
 
     shader_program.v_pos = gl.getAttribLocation(shader_program, "Position");
+    shader_program.v_nor = gl.getAttribLocation(shader_program, "Normal");
     shader_program.v_col = gl.getAttribLocation(shader_program, "Color");
     gl.enableVertexAttribArray(shader_program.v_pos);
+    gl.enableVertexAttribArray(shader_program.v_nor);
     gl.enableVertexAttribArray(shader_program.v_col);
     shader_program.p_mat = gl.getUniformLocation(shader_program, "P");
     shader_program.mv_mat = gl.getUniformLocation(shader_program, "MV");
+    shader_program.n_mat = gl.getUniformLocation(shader_program, "N");
+    console.log(shader_program.n_mat);
+    shader_program.light = gl.getUniformLocation(shader_program, "light_direction");
 
     map_position_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
     var v = [ ];
+    var vh = [ ];
     var vc = [ ];
     // remember: need one more, for the edges
     for (var y=0; y<=map_y; y++) {
@@ -70,39 +78,54 @@ function shaders_loaded() {
             var dy = Math.abs(y - map_y / 2.0);
             var d = Math.sqrt(dx * dx + dy * dy);
             // boundaries, 0-1
-            var h_max = Math.min( 1.0 - (dx / (map_x/2.0)) , 1.0 - (dy / (map_y/2.0)) );
+            var h_max = Math.min( 1.0 - (dx / (map_x/1.4)) , 1.0 - (dy / (map_y/1.4)) );
             h_max = Math.pow(h_max, 1.5);
             if (h_max < 0.0) { h_max = 0.0; }
             h = 0;
             h += rand_field(x / 25.0 , y / 25.0 ) * 0.75;
-            h += rand_field(x / 10.0 , y / 10.0 ) * 0.22;
-            h += rand_field(x / 2.0 , y / 2.0) * 0.03;
+            h += rand_field(x / 10.0 , y / 10.0 ) * 0.23;
+            h += rand_field(x / 2.0 , y / 2.0) * 0.02;
             // h is 0-1
-            var h_min = 2.0 / (2.0 + rand_field(x / 30.0, y/30.0));
-            if (h > h_min) {
-                h = h_min - (h - h_min);
-            }
-            h = (h - 0.1) *  h_max;
-            // h is 0-0.9
             // create grooves!
+            //var h_min = 2.0 / (2.0 + rand_field(x / 30.0, y/30.0));
+            //if (h > h_min) {
+            //    h = h_min - (h - h_min);
+            //}
+            h = h * h_max - (1.0-h_max)*0.2;
+            // h is 0-1
+
             if (h < 0.0) { h = 0.0; }
-            // h = 0-0.5
-            h *= 100.0;
+            // h = 0-1
+
+            // Lighting will take care of this
+            //vc.push(1.0, 1.0, 1.0, 1.0);
+
+            // Mock
+            var terrain = h - rand_field(x / 4.5, y / 4.5) * 0.02;
+            if (terrain <= 0.0) {
+                vc.push(0.2, 0.2, 0.5, 1.0);
+            } else if (terrain < 0.02) {
+                vc.push(1.0, 1.0, 0.7, 1.0);
+            } else if (terrain < 0.15) {
+                vc.push(0.0, 1.0, 0.0, 1.0);
+            } else if (terrain < 0.35) {
+                vc.push(0.0, 0.7, 0.0, 1.0);
+            } else if (terrain < 0.5) {
+                vc.push(0.5, 0.5, 0.5, 1.0);
+            } else {
+                vc.push(1.0, 1.0, 1.0, 1.0);
+            }
+
+            h *= 50.0;
             // h = 0-50, tall enough
 
+            vh.push(h);
             v.push(x, h, y);
             //vc.push((x%2)/2.0, (x+y)%4/4.0, (y%3)/3.0, 1.0);
             if (x == Math.floor(camera.t[0]) && y == Math.floor(camera.t[2])) {
                 camera.t[1] = h+1;
             }
-            h /= 100.0;
-            if (x == 0 && y == 0) {
-                vc.push(1.0, 0.0, 0.0, 1.0);
-            } else if (x == map_x && y == 0) {
-                vc.push(0.0, 1.0, 0.0, 1.0);
-            } else {
-                vc.push(h, h, h, 1.0);
-            }
+
         }
     }
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STATIC_DRAW);
@@ -110,6 +133,37 @@ function shaders_loaded() {
     map_color_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_color_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vc), gl.STATIC_DRAW);
+
+    // normals
+    // edges are flat
+    map_normal_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, map_normal_buffer);
+    var vn = [ ];
+    var n_tmp = vec3.create();
+    for (var x=0; x<=map_x; x++) {
+        vn.push(0.0, 1.0, 0.0);
+    }
+    for (var y=1; y<map_y; y++) {
+        vn.push(0.0, 1.0, 0.0);
+        for (var x=1; x<map_x; x++) {
+            n_tmp = vec3.fromValues(
+                vh[(x+1) + (map_x+1) * y] - vh[(x-1) + (map_x+1) * y],
+                1.0,
+                vh[x + (map_x+1) * (y+1)] - vh[x + (map_x+1) * (y-1)]
+            );
+            vec3.normalize(n_tmp, n_tmp);
+            vn.push(n_tmp[0], n_tmp[1], n_tmp[2]);
+            //vn.push(0.0, 1.0, 0.0);
+            if (y==20 && x ==20) {
+                console.log(n_tmp);
+            }
+        }
+        vn.push(0.0, 1.0, 0.0);
+    }
+    for (var x=0; x<=map_x; x++) {
+        vn.push(0.0, 1.0, 0.0);
+    }
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vn), gl.STATIC_DRAW);
 
     map_index_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_index_buffer);
@@ -149,6 +203,7 @@ function do_webgl () {
 
     p_mat = mat4.create();
     mv_mat = mat4.create();
+    n_mat = mat3.create();
 
     //alert($('#shader-fs').html());
 
@@ -244,10 +299,21 @@ function draw() {
     gl.vertexAttribPointer(shader_program.v_pos, 3, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, map_color_buffer);
     gl.vertexAttribPointer(shader_program.v_col, 4, gl.FLOAT, false, 0, 0);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_index_buffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, map_normal_buffer);
+    gl.vertexAttribPointer(shader_program.v_nor, 3, gl.FLOAT, false, 0, 0);
+
     gl.uniformMatrix4fv(shader_program.p_mat, false, p_mat);
     gl.uniformMatrix4fv(shader_program.mv_mat, false, mv_mat);
+
+    n_mat = mat3.create();
+    //mat4.toInverseMat3(mv_mat, n_mat);
+    //mat3.normalFromMat4(n_mat, mv_mat);
+    //mat3.transpose(n_mat, n_mat);
+    mat3.identity(n_mat);
+    gl.uniformMatrix3fv(shader_program.n_mat, false, n_mat);
+
     //gl.drawArrays(gl.TRIANGLES, 0, v_count);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_index_buffer);
     gl.drawElements(gl.TRIANGLES, v_count, gl.UNSIGNED_SHORT, 0);
 }
 
