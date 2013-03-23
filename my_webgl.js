@@ -34,6 +34,8 @@ var move_keys = {
     down: false,
 };
 
+var noise_tex;
+
 window.requestAnimFrame =
     window.requestAnimationFrame ||
     window.mozRequestAnimationFrame ||
@@ -63,6 +65,7 @@ function shaders_loaded() {
     shader_program.mv_mat = gl.getUniformLocation(shader_program, "MV");
     shader_program.n_mat = gl.getUniformLocation(shader_program, "N");
     shader_program.light = gl.getUniformLocation(shader_program, "light_direction");
+    shader_program.noise_tex = gl.getUniformLocation(shader_program, "noise_tex");
 
     map_position_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
@@ -242,7 +245,27 @@ function do_webgl () {
         }
     });
 
+    noise_tex = gl.createTexture();
+    noise_tex.image = new Image();
+    noise_tex.image.onload = noise_loaded;
+    noise_tex.image.src = "noise.png";
+    //console.log('requesting noise.png');
+
     //window.mozRequestAnimationFrame(draw);
+}
+
+function noise_loaded() {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, noise_tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, noise_tex.image);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    //console.log('noise texture loaded');
+    noise_tex.loaded = true;
 }
 
 function draw() {
@@ -250,6 +273,9 @@ function draw() {
     gl.clearColor(0.0, 0.6, 1.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (!shader_program) {
+        return;
+    }
+    if (!noise_tex || !noise_tex.loaded) {
         return;
     }
 
@@ -309,6 +335,10 @@ function draw() {
     //mat3.transpose(n_mat, n_mat);
     mat3.identity(n_mat);
     gl.uniformMatrix3fv(shader_program.n_mat, false, n_mat);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, noise_tex);
+    gl.uniform1i(shader_program.noise_tex, 0);
 
     //gl.drawArrays(gl.TRIANGLES, 0, v_count);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_index_buffer);

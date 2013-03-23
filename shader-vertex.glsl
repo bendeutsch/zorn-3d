@@ -9,6 +9,7 @@ uniform mat3 N;
 uniform vec3 light_direction;
 
 varying vec4 color;
+varying vec3 pos;
 
 void main(void) {
     gl_Position = P * MV * vec4(Position, 1.0);
@@ -22,5 +23,6 @@ void main(void) {
     //    max(min(abs(normal.y), 1.0),0.0),
     //    max(min(abs(normal.z), 1.0),0.0),
     //1.0);
+    pos = Position;
 }
 
