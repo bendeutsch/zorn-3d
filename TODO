@@ -1,0 +1,62 @@
+Tiling:
+
+129 x 129 grid points per tile
+full tile element array with 128 x 128 x 2 tris
+half element arrays with 64 x 64 x 2 tris
+quarter element arrays with 32 x 32 x 2 tris
+
+in-between blocks:
+
+  o - o - o - o
+  | / |\ /|\ /|
+  o - o-o-o-o-o
+  | > o/o/o/o/o
+  o - o/o/o/o/o
+
+The inner ones are normal. The outer ones 4 times as big.
+The outer ones directly next to the inner ones have three
+triangles (directly, not diagonal).
+
+Need 8 in-between element index blocks per sampling level:
+
+  123
+  4.5
+  678
+
+I thought of downsampling twice within one tile, but what's the rush?
+We're not running out of element array buffers...
+
+Tiles don't need the full position vector for x and y, they just need
+a byte each! And the tile itself needs a global x and y offset.
+The actual position can be calculated in the vertex shader.
+
+Textures:
+
+We have (at least) 8 to play with
+-> 8 bytes of "terrainyness" levels.
+What about all 0s? -> ignore 1, so 7 bytes. Can't get more textures :-/
+Burntness / ash ? Does this need a texture, too?
+Or just color-invert "snow"?
+
+ocean / water
+sand
+grass
+earth
+forest
+rock
+snow
+tarmac
+
+previous color X0
+current color X1
+alpha value A
+texture weight T
+if (T > A) {
+    color = X1
+} else {
+    color = X0 ( no blending )
+    color = A * X1 + 1-A * X0 ( full blending )
+}
+Actually, whether to blend or not is terrain-dependent.
+
+
