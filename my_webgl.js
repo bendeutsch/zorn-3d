@@ -17,10 +17,20 @@ var v_count = 0;
 var map_x = 255;
 var map_y = 255;
 
+function Map( ) {
+    this.heights = [];
+    this.position_buffer = null;
+    this.color_buffer = null;
+    this.index_buffer = null;
+    this.normal_buffer = null;
+    this.width = 128; // in tiles
+    this.height = 128; 
+}
+
 var camera = {
     rx: 0.1,
     ry: 0.0,
-    t: vec3.fromValues(map_x / 2.0, 0.0, map_y / 2.0),
+    t: vec3.fromValues(64.0, 0.0, 64.0),
 };
 var move_mat = mat3.create();
 var move_vec = vec3.create();
@@ -66,6 +76,10 @@ function shaders_loaded() {
     shader_program.n_mat = gl.getUniformLocation(shader_program, "N");
     shader_program.light = gl.getUniformLocation(shader_program, "light_direction");
     shader_program.noise_tex = gl.getUniformLocation(shader_program, "noise_tex");
+
+}
+
+function make_map() {
 
     map_position_buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
@@ -245,6 +259,8 @@ function do_webgl () {
         }
     });
 
+    make_map();
+
     noise_tex = gl.createTexture();
     noise_tex.image = new Image();
     noise_tex.image.onload = noise_loaded;
@@ -319,30 +335,32 @@ function draw() {
     vec3.negate(move_vec, camera.t)
     mat4.translate(mv_mat, mv_mat, move_vec);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
-    gl.vertexAttribPointer(shader_program.v_pos, 3, gl.FLOAT, false, 0, 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, map_color_buffer);
-    gl.vertexAttribPointer(shader_program.v_col, 4, gl.FLOAT, false, 0, 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, map_normal_buffer);
-    gl.vertexAttribPointer(shader_program.v_nor, 3, gl.FLOAT, false, 0, 0);
+    if (map_index_buffer) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, map_position_buffer);
+        gl.vertexAttribPointer(shader_program.v_pos, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, map_color_buffer);
+        gl.vertexAttribPointer(shader_program.v_col, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, map_normal_buffer);
+        gl.vertexAttribPointer(shader_program.v_nor, 3, gl.FLOAT, false, 0, 0);
 
-    gl.uniformMatrix4fv(shader_program.p_mat, false, p_mat);
-    gl.uniformMatrix4fv(shader_program.mv_mat, false, mv_mat);
+        gl.uniformMatrix4fv(shader_program.p_mat, false, p_mat);
+        gl.uniformMatrix4fv(shader_program.mv_mat, false, mv_mat);
 
-    n_mat = mat3.create();
-    //mat4.toInverseMat3(mv_mat, n_mat);
-    //mat3.normalFromMat4(n_mat, mv_mat);
-    //mat3.transpose(n_mat, n_mat);
-    mat3.identity(n_mat);
-    gl.uniformMatrix3fv(shader_program.n_mat, false, n_mat);
+        n_mat = mat3.create();
+        //mat4.toInverseMat3(mv_mat, n_mat);
+        //mat3.normalFromMat4(n_mat, mv_mat);
+        //mat3.transpose(n_mat, n_mat);
+        mat3.identity(n_mat);
+        gl.uniformMatrix3fv(shader_program.n_mat, false, n_mat);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, noise_tex);
-    gl.uniform1i(shader_program.noise_tex, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, noise_tex);
+        gl.uniform1i(shader_program.noise_tex, 0);
 
-    //gl.drawArrays(gl.TRIANGLES, 0, v_count);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_index_buffer);
-    gl.drawElements(gl.TRIANGLES, v_count, gl.UNSIGNED_SHORT, 0);
+        //gl.drawArrays(gl.TRIANGLES, 0, v_count);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_index_buffer);
+        gl.drawElements(gl.TRIANGLES, v_count, gl.UNSIGNED_SHORT, 0);
+    }
 }
 
 function mouse_move(e) {
