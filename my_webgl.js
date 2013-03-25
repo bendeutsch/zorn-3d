@@ -7,7 +7,10 @@ var p_mat;
 var mv_mat;
 var n_mat;
 
-var map_tile;
+//var map_tile;
+var map_tiles = [];
+
+var index_buffer = null;
 
 var camera = {
     rx: 0.1,
@@ -100,6 +103,7 @@ function MapTile( origin_x, origin_y ) {
     for (var y=0; y<=this.height; y++) {
         for (var x=0; x<=this.width; x++) {
             wx = this.origin_x + x;
+            wy = this.origin_y + y;
             n_tmp = vec3.fromValues(
                 map_height_at(wx+1, wy, true) - map_height_at(wx-1, wy, true),
                 //this.heights[(x+1) + (this.width+1) * y] - this.heights[(x-1) + (this.width+1) * y],
@@ -113,21 +117,6 @@ function MapTile( origin_x, origin_y ) {
     }
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vn), gl.STATIC_DRAW);
 
-    this.index_buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.index_buffer);
-    var vi = [ ];
-    for (var y=0; y<this.height; y++) {
-        for (var x=0; x<this.width; x++) {
-            vi.push( (x+0) + (this.width+1)*(y+0));
-            vi.push( (x+0) + (this.width+1)*(y+1));
-            vi.push( (x+1) + (this.width+1)*(y+0));
-
-            vi.push( (x+1) + (this.width+1)*(y+0));
-            vi.push( (x+0) + (this.width+1)*(y+1));
-            vi.push( (x+1) + (this.width+1)*(y+1));
-        }
-    }
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
 }
 
 function shaders_loaded() {
@@ -160,8 +149,27 @@ function shaders_loaded() {
 
 function make_map() {
 
-    map_tile = new MapTile(0, 0);
+    for (var x=0; x < 4; x++) {
+        for (var y=0; y < 4; y++) {
+            map_tiles.push(new MapTile(x * 128, y * 128)); 
+        }
+    }
 
+    index_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+    var vi = [ ];
+    for (var y=0; y<128; y++) {
+        for (var x=0; x<128; x++) {
+            vi.push( (x+0) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+1));
+            vi.push( (x+1) + (128+1)*(y+0));
+
+            vi.push( (x+1) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+1));
+            vi.push( (x+1) + (128+1)*(y+1));
+        }
+    }
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
 }
 
 function do_webgl () {
@@ -302,7 +310,8 @@ function draw() {
     vec3.negate(move_vec, camera.t)
     mat4.translate(mv_mat, mv_mat, move_vec);
 
-    if (map_tile) {
+    for(var map_i = 0; map_i < map_tiles.length; map_i++) {
+        var map_tile = map_tiles[map_i];
         gl.bindBuffer(gl.ARRAY_BUFFER, map_tile.position_buffer);
         gl.vertexAttribPointer(shader_program.v_pos, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, map_tile.color_buffer);
@@ -324,7 +333,7 @@ function draw() {
         gl.bindTexture(gl.TEXTURE_2D, noise_tex);
         gl.uniform1i(shader_program.noise_tex, 0);
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, map_tile.index_buffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
         gl.drawElements(gl.TRIANGLES, ( map_tile.width * map_tile.height * 6), gl.UNSIGNED_SHORT, 0);
     }
 }
@@ -479,6 +488,27 @@ function rand_field(x, y) {
 }
 
 function map_height_at(x, y, scaled) {
+    return map_height_rolling(x, y, scaled);
+}
+
+function map_height_rolling(x, y, scaled) {
+    var h = 0.0;
+    h += rand_field(x / 47.0 , y / 47.0 ) * 0.75;
+    h += rand_field(x / 23.0 , y / 23.0 ) * 0.23;
+    h += rand_field(x / 2.0 , y / 2.0) * 0.02;
+    h = (h - 0.3);
+    // h is -0.3-0.7
+
+    if (h < 0.0) { h = 0.0; }
+    // h = 0-0.7
+
+    if (scaled) {
+        return h * 50.0;
+    } else {
+        return h;
+    }
+}
+function map_height_island(x, y, scaled) {
     //console.log(x, y);
     var dx = Math.abs(x - 255 / 2.0);
     var dy = Math.abs(y - 255 / 2.0);
@@ -510,21 +540,3 @@ function map_height_at(x, y, scaled) {
     }
 }
 
-function discrete_map_height_at(x, y) {
-    if (!map_tile) {
-        return 0.0;
-    }
-    if (x <= 0.0 || y <= 0.0 || x >= map_tile.width || y >= map_tile.height) {
-        return 0.0; // sea level
-    }
-    var x0 = Math.floor(x);
-    var y0 = Math.floor(y);
-    var x1 = x0 + 1;
-    var y1 = y0 + 1;
-    var dx = x - x0;
-    var dy = y - y0;
-    return (1-dx)*(1-dy)*map_tile.heights[x0 + (map_tile.width+1) * y0] +
-        (dx)*(1-dy)*map_tile.heights[x1 + (map_tile.width+1) * y0] +
-        (1-dx)*(dy)*map_tile.heights[x0 + (map_tile.width+1) * y1] +
-        (dx)*(dy)*map_tile.heights[x1 + (map_tile.width+1) * y1];
-}
