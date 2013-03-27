@@ -11,6 +11,9 @@ var n_mat;
 var map_tiles = [];
 
 var index_buffer = null;
+var index_buffer_2 = null;
+var index_buffer_4 = null;
+var index_buffer_8 = null;
 
 var camera = {
     rx: 0.1,
@@ -167,6 +170,54 @@ function make_map() {
             vi.push( (x+1) + (128+1)*(y+0));
             vi.push( (x+0) + (128+1)*(y+1));
             vi.push( (x+1) + (128+1)*(y+1));
+        }
+    }
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
+
+    index_buffer_2 = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_2);
+    var vi = [ ];
+    for (var y=0; y<128; y+=2) {
+        for (var x=0; x<128; x+=2) {
+            vi.push( (x+0) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+2));
+            vi.push( (x+2) + (128+1)*(y+0));
+
+            vi.push( (x+2) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+2));
+            vi.push( (x+2) + (128+1)*(y+2));
+        }
+    }
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
+
+    index_buffer_4 = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_4);
+    var vi = [ ];
+    for (var y=0; y<128; y+=4) {
+        for (var x=0; x<128; x+=4) {
+            vi.push( (x+0) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+4));
+            vi.push( (x+4) + (128+1)*(y+0));
+
+            vi.push( (x+4) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+4));
+            vi.push( (x+4) + (128+1)*(y+4));
+        }
+    }
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
+
+    index_buffer_8 = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_8);
+    var vi = [ ];
+    for (var y=0; y<128; y+=8) {
+        for (var x=0; x<128; x+=8) {
+            vi.push( (x+0) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+8));
+            vi.push( (x+8) + (128+1)*(y+0));
+
+            vi.push( (x+8) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+8));
+            vi.push( (x+8) + (128+1)*(y+8));
         }
     }
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
@@ -333,8 +384,26 @@ function draw() {
         gl.bindTexture(gl.TEXTURE_2D, noise_tex);
         gl.uniform1i(shader_program.noise_tex, 0);
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-        gl.drawElements(gl.TRIANGLES, ( map_tile.width * map_tile.height * 6), gl.UNSIGNED_SHORT, 0);
+        var center_x = map_tile.origin_x + 64;
+        var center_y = map_tile.origin_y + 64;
+        center_x = Math.abs(center_x - camera.t[0]);
+        center_y = Math.abs(center_y - camera.t[2]);
+        var dist = center_x + center_y;
+
+        // we risk tears, but who cares at the moment.
+        if (dist > 512) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_8);
+            gl.drawElements(gl.TRIANGLES, ( map_tile.width/8 * map_tile.height/8 * 6), gl.UNSIGNED_SHORT, 0);
+        } else if (dist > 384) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_4);
+            gl.drawElements(gl.TRIANGLES, ( map_tile.width/4 * map_tile.height/4 * 6), gl.UNSIGNED_SHORT, 0);
+        } else if (dist > 256) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_2);
+            gl.drawElements(gl.TRIANGLES, ( map_tile.width/2 * map_tile.height/2 * 6), gl.UNSIGNED_SHORT, 0);
+        } else {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+            gl.drawElements(gl.TRIANGLES, ( map_tile.width * map_tile.height * 6), gl.UNSIGNED_SHORT, 0);
+        }
     }
 }
 
