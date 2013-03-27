@@ -10,10 +10,7 @@ var n_mat;
 //var map_tile;
 var map_tiles = [];
 
-var index_buffer = null;
-var index_buffer_2 = null;
-var index_buffer_4 = null;
-var index_buffer_8 = null;
+var index_buffer = [null, null, null, null];
 
 var camera = {
     rx: 0.1,
@@ -150,77 +147,47 @@ function shaders_loaded() {
 
 }
 
+var make_map_counter = 0;
+
 function make_map() {
-
-    for (var x=0; x < 4; x++) {
-        for (var y=0; y < 4; y++) {
-            map_tiles.push(new MapTile(x * 128, y * 128)); 
-        }
+    if (make_map_counter < 4) {
+        $('#message').text('Generating index arrays: '+ (make_map_counter+1) +' / 4...');
+        make_map_index(make_map_counter);
+    } else {
+        $('#message').text('Generating map tiles: '+ (make_map_counter-3) +' / 64...');
+        make_map_tile( (make_map_counter - 4) % 8, Math.floor((make_map_counter - 4) / 8) );
     }
+    make_map_counter++;
+    if (make_map_counter < 68) {
+        window.setTimeout(make_map, 10);
+    } else {
+        $('#message').text('Done. Click the landscape above!');
+    }
+}
 
-    index_buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+function make_map_index( which ) {
+    var power = Math.pow(2, which);
+    index_buffer[which] = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer[which]);
     var vi = [ ];
-    for (var y=0; y<128; y++) {
-        for (var x=0; x<128; x++) {
+    for (var y=0; y<128; y+=power) {
+        for (var x=0; x<128; x+=power) {
             vi.push( (x+0) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+1));
-            vi.push( (x+1) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+power));
+            vi.push( (x+power) + (128+1)*(y+0));
 
-            vi.push( (x+1) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+1));
-            vi.push( (x+1) + (128+1)*(y+1));
+            vi.push( (x+power) + (128+1)*(y+0));
+            vi.push( (x+0) + (128+1)*(y+power));
+            vi.push( (x+power) + (128+1)*(y+power));
         }
     }
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
+}
 
-    index_buffer_2 = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_2);
-    var vi = [ ];
-    for (var y=0; y<128; y+=2) {
-        for (var x=0; x<128; x+=2) {
-            vi.push( (x+0) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+2));
-            vi.push( (x+2) + (128+1)*(y+0));
+function make_map_tile( x, y ) {
 
-            vi.push( (x+2) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+2));
-            vi.push( (x+2) + (128+1)*(y+2));
-        }
-    }
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
+    map_tiles.push(new MapTile(x * 128, y * 128)); 
 
-    index_buffer_4 = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_4);
-    var vi = [ ];
-    for (var y=0; y<128; y+=4) {
-        for (var x=0; x<128; x+=4) {
-            vi.push( (x+0) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+4));
-            vi.push( (x+4) + (128+1)*(y+0));
-
-            vi.push( (x+4) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+4));
-            vi.push( (x+4) + (128+1)*(y+4));
-        }
-    }
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
-
-    index_buffer_8 = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_8);
-    var vi = [ ];
-    for (var y=0; y<128; y+=8) {
-        for (var x=0; x<128; x+=8) {
-            vi.push( (x+0) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+8));
-            vi.push( (x+8) + (128+1)*(y+0));
-
-            vi.push( (x+8) + (128+1)*(y+0));
-            vi.push( (x+0) + (128+1)*(y+8));
-            vi.push( (x+8) + (128+1)*(y+8));
-        }
-    }
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vi), gl.STATIC_DRAW);
 }
 
 function do_webgl () {
@@ -391,17 +358,17 @@ function draw() {
         var dist = center_x + center_y;
 
         // we risk tears, but who cares at the moment.
-        if (dist > 512) {
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_8);
+        if (dist > 512 && index_buffer[3]) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer[3]);
             gl.drawElements(gl.TRIANGLES, ( map_tile.width/8 * map_tile.height/8 * 6), gl.UNSIGNED_SHORT, 0);
-        } else if (dist > 384) {
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_4);
+        } else if (dist > 384 && index_buffer[2]) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer[2]);
             gl.drawElements(gl.TRIANGLES, ( map_tile.width/4 * map_tile.height/4 * 6), gl.UNSIGNED_SHORT, 0);
-        } else if (dist > 256) {
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer_2);
+        } else if (dist > 256 && index_buffer[1]) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer[1]);
             gl.drawElements(gl.TRIANGLES, ( map_tile.width/2 * map_tile.height/2 * 6), gl.UNSIGNED_SHORT, 0);
-        } else {
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+        } else if (index_buffer[0]) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer[0]);
             gl.drawElements(gl.TRIANGLES, ( map_tile.width * map_tile.height * 6), gl.UNSIGNED_SHORT, 0);
         }
     }
